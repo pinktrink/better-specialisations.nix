@@ -16,13 +16,34 @@ in {
     type = types.attrsOf (types.submodule ({ name, ... }: {
       config.configuration.environment.systemPackages = mkBefore [
         (pkgs.writeShellScriptBin "nixos-rebuild" ''
-          for a in "$@"; do
-            if [[ "$a" == "switch" ]] || [[ "$a" == "test" ]]; then
-              exec ${getExe pkgs.nixos-rebuild} "$@" --specialisation ${escapeShellArg name}
+          all=()
+          pos=""
+          while [[ "$#" -gt 0 ]]; do
+            if [[ "$1" != -* ]] && [[ -z "$pos" ]]; then
+              pos="$1"
+              shift
+            elif [[ "$1" =~ ^--(max-jobs|cores|log-format|builders|include|update-input|file|attr|profile-name|specialisation|build-host|target-host|image-variant) ]] || [[ "$1" = "--flake" ]] && [[ "$2" != -* ]]; then
+              all+=("$1" "$2")
+              shift
+              shift
+            elif [[ "$1" =~ ^--(option|override-input) ]]; then
+              all+=("$1" "$2" "$3")
+              shift
+              shift
+              shift
+            else
+              all+=("$1")
+              shift
             fi
           done
 
-          exec ${getExe pkgs.nixos-rebuild} "$@"
+          if [[ "$pos" = "switch" ]]; then
+            ${getExe pkgs.nixos-rebuild} "''${all[@]}" boot
+            exec /nix/var/nix/profiles/system/specialisation/${escapeShellArg name}/bin/switch-to-configuration test
+          elif [[ "$pos" = "test" ]]; then
+            exec ${getExe pkgs.nixos-rebuild} --specialisation ${escapeShellArg name} "''${all[@]}" "$pos"
+          fi
+          exec ${getExe pkgs.nixos-rebuild} "''${all[@]}" "$pos"
         '')
         (runCommand "base-nixos-rebuild" {} ''
           mkdir -p $out/bin
