@@ -16,6 +16,7 @@ in {
     type = types.attrsOf (types.submodule ({ name, ... }: {
       config.configuration.environment.systemPackages = mkBefore [
         (pkgs.writeShellScriptBin "nixos-rebuild" ''
+          set -euo pipefail
           all=()
           pos=""
           while [[ "$#" -gt 0 ]]; do
@@ -38,7 +39,7 @@ in {
           done
 
           if [[ "$pos" = "switch" ]]; then
-            ${getExe pkgs.nixos-rebuild} "''${all[@]}" boot
+            ${getExe pkgs.nixos-rebuild} "''${all[@]}" boot &&
             exec /nix/var/nix/profiles/system/specialisation/${escapeShellArg name}/bin/switch-to-configuration test
           elif [[ "$pos" = "test" ]]; then
             exec ${getExe pkgs.nixos-rebuild} --specialisation ${escapeShellArg name} "''${all[@]}" "$pos"
